@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Diabetes Predictor + Stats</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Simple styles -->
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 900px; margin: 32px auto; padding: 0 16px; }
+    h1 { margin-bottom: 6px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 12px 0; }
+    label { display:block; margin: 10px 0 6px; font-weight: 600; }
+    input { width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; }
+    button { margin-top:14px; padding:10px 14px; border:0; border-radius:10px; background:#0d6efd; color:#fff; cursor:pointer; }
+    .muted { color:#666; }
+    .stats { display:flex; gap:16px; flex-wrap:wrap; }
+    .stat { background:#f7f7f7; border-radius:10px; padding:10px 12px; min-width:140px; }
+    .result { margin-top:8px; }
+  </style>
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h1>Diabetes Predictor</h1>
+  <p class="muted">Enter values → Predict → See basic stats and charts.</p>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label>Pregnancies</label>
+        <input id="Pregnancies" type="number" value="2">
+      </div>
+      <div>
+        <label>Glucose</label>
+        <input id="Glucose" type="number" value="130">
+      </div>
+      <div>
+        <label>BMI</label>
+        <input id="BMI" type="number" step="0.1" value="31.6">
+      </div>
+      <div>
+        <label>Age</label>
+        <input id="Age" type="number" value="45">
+      </div>
+    </div>
+    <button id="go">Predict</button>
+    <div id="msg" class="muted result">No prediction yet.</div>
+  </div>
+
+  <div class="card">
+    <strong>Summary</strong>
+    <div class="stats" id="stats">
+      <div class="stat">Total: <b id="total">0</b></div>
+      <div class="stat">Diabetics: <b id="pos">0</b></div>
+      <div class="stat">Non-diabetics: <b id="neg">0</b></div>
+      <div class="stat">Avg prob: <b id="avg">0.00</b></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <strong>Class Distribution</strong>
+      <canvas id="barChart" height="220"></canvas>
+    </div>
+    <div class="card">
+      <strong>30-Day Trend</strong>
+      <canvas id="lineChart" height="220"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const msg = $("msg");
+
+    // Charts
+    let barChart, lineChart;
+
+    function setupCharts() {
+      const barCtx = $("barChart").getContext("2d");
+      barChart = new Chart(barCtx, {
+        type: "bar",
+        data: {
+          labels: ["Non-diabetics", "Diabetics"],
+          datasets: [{ label: "Count", data: [0, 0] }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+
+      const lineCtx = $("lineChart").getContext("2d");
+      lineChart = new Chart(lineCtx, {
+        type: "line",
+        data: { labels: [], datasets: [
+          { label: "Non-diabetics", data: [], tension: 0.2 },
+          { label: "Diabetics", data: [], tension: 0.2 }
+        ]},
+        options: { responsive: true }
+      });
+    }
+
+    async function refreshMetrics() {
+      try {
+        const [sumRes, tsRes] = await Promise.all([
+          fetch("/metrics"),
+          fetch("/metrics/timeseries")
+        ]);
+        const sum = await sumRes.json();
+        const ts = await tsRes.json();
+
+        $("total").textContent = sum.total ?? 0;
+        $("pos").textContent = sum.diabetics ?? 0;
+        $("neg").textContent = sum.non_diabetics ?? 0;
+        $("avg").textContent = (sum.avg_probability ?? 0).toFixed(2);
+
+        // Update bar
+        barChart.data.datasets[0].data = [sum.non_diabetics || 0, sum.diabetics || 0];
+        barChart.update();
+
+        // Update line
+        lineChart.data.labels = ts.map(d => d.date);
+        lineChart.data.datasets[0].data = ts.map(d => d.non_diabetics);
+        lineChart.data.datasets[1].data = ts.map(d => d.diabetics);
+        lineChart.update();
+      } catch { /* ignore */ }
+    }
+
+    $("go").onclick = async () => {
+      msg.textContent = "Predicting...";
+      const payload = {
+        Pregnancies: Number($("Pregnancies").value),
+        Glucose: Number($("Glucose").value),
+        BMI: Number($("BMI").value),
+        Age: Number($("Age").value),
+      };
+      try {
+        const r = await fetch("/predict", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          msg.textContent = data.error || "Error";
+          return;
+        }
+        msg.textContent = `Probability: ${(data.probability*100).toFixed(2)}% | Class: ${data.predicted_class}`;
+        refreshMetrics();
+      } catch {
+        msg.textContent = "Server unreachable.";
+      }
+    };
+
+    setupCharts();
+    refreshMetrics();
+  </script>
+</body>
+</html>
