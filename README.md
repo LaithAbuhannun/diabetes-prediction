@@ -13,17 +13,7 @@ The goal: make diabetes screening logic accessible and testable in seconds, not 
 
 ## 🔴 Demo
 
-> After you upload your screen recording to GitHub and it gives you a link like
-> `https://github.com/user-attachments/assets/...`, paste it below.
-
-<p align="center">
-  <video src="VIDEO_URL_HERE"
-         width="480"
-         controls
-         muted
-         playsinline>
-  </video>
-</p>
+https://github.com/user-attachments/assets/2ae88c79-64b7-4b99-b13a-4cfe0743c426
 
 **What the demo shows:**
 
