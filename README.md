@@ -148,7 +148,7 @@ Here’s your current layout:
 ```text
 diabetes-prediction/
 ├─ README.md                 # <-- this file
-├─  create_model.ipynb       # Mode training and testing before deployment             
+├─ create_model.ipynb        # Mode training and testing before deployment             
 ├─ interface.html            # Web UI to enter patient metrics + view prediction
 └─ server/
    ├─ server.py              # Backend inference API (Flask/FastAPI style)
